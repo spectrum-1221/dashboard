@@ -17,11 +17,12 @@ const FILTER_AKUN = `
 // Satu query yang mengembalikan mutasi akun Kas/Bank per tanggal (jurnal berstatus approved).
 // Kolom hasil WAJIB: tanggal | kode | nama | dimensi | nilai   (nilai = debit - kredit)
 // Placeholder: {{awal}} = 1 Januari tahun terpilih, {{sampai}} = tanggal terakhir yang dibutuhkan, {{filterAkun}}.
-// Transaksi sebelum {{awal}} dijadikan satu baris (saldo awal) lewat GREATEST().
+// Transaksi sebelum {{awal}} dijadikan satu baris saldo awal bertanggal {{awal}} - 1 hari.
 // Dimensi = nama departemen dan/atau proyek pada baris jurnal (dipakai untuk menentukan kategori dana).
 // Tabel/kolom mengikuti query bawaan Zahir Insight (bb_trx): g_jurnal, jurnalvc, kiraan, subklas, klas, dept, job.
 const SQL_MUTASI = `
-SELECT GREATEST(g.tanggal::date, DATE '{{awal}}')                                   AS tanggal,
+SELECT (CASE WHEN g.tanggal::date < DATE '{{awal}}' THEN DATE '{{awal}}' - 1
+             ELSE g.tanggal::date END)                                              AS tanggal,
        k.code                                                                       AS kode,
        k.nama                                                                       AS nama,
        concat_ws(' / ', NULLIF(d.nama, ''), NULLIF(p.namapekerjaan, ''))            AS dimensi,

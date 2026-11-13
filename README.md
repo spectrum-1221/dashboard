@@ -28,6 +28,9 @@ Di dashboard ada panel **Diagnosa** (di bagian bawah): daftar akun/dimensi yang 
 "Lihat semua akun aset" untuk memilih `FILTER_AKUN`. Bila zsql membalas galat SQL, pesannya ditampilkan apa adanya.
 
 ## Catatan
+- Filter **Periode** meniru Zahir Online: Hari Ini, Minggu Ini, Bulan Ini, Bulan Lalu, Kuartal Ini, Tahun Ini, Tahun Lalu,
+  Pilih Bulan (ikon kalender), dan Custom (Dari-Sampai). Saldo (pie, bar, kotak) dihitung per tanggal akhir periode,
+  grafik garis memakai tahun dari tanggal akhir, dan kotak biru menampilkan perubahan kas selama periode.
 - Data dibaca lewat endpoint zsql (`/api/v2/zsql`) memakai Bearer token + header Slug dari perusahaan yang dipilih.
 - Highcharts dipasang lokal (npm), tidak butuh CDN.
 - Bulan yang belum terjadi di tahun berjalan tidak digambar di grafik garis.

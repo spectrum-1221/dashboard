@@ -127,17 +127,73 @@ async function useDatabase(){
 
 /* ---------- dashboard ---------- */
 Highcharts.setOptions({ lang: { thousandsSep: '.', decimalPoint: ',', numericSymbols: [' rb', ' jt', ' M', ' T', ' Q', ' Qi'] }, credits: { enabled: false } });
-const now = new Date();
-for (let y = now.getFullYear() + 1; y >= now.getFullYear() - 8; y--) $('#tahun').add(new Option(y, y));
-$('#tahun').value = now.getFullYear();
-$('#tanggal').value = now.toISOString().slice(0, 10);
-$('#tahun').addEventListener('change', () => { const y = $('#tahun').value; $('#tanggal').value = +y === now.getFullYear() ? now.toISOString().slice(0, 10) : `${y}-12-31`; });
+/* ---------- filter periode (gaya Zahir: Today / This Week / This Month / Custom + pemilih bulan) ---------- */
+const pad = n => String(n).padStart(2, '0');
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const akhirBulan = (y, m) => new Date(y, m + 1, 0);
+const PRESET = {
+  hari:      () => { const n = new Date(); return [n, n]; },
+  minggu:    () => { const n = new Date(), k = (n.getDay() + 6) % 7; return [new Date(n.getFullYear(), n.getMonth(), n.getDate() - k), new Date(n.getFullYear(), n.getMonth(), n.getDate() - k + 6)]; }, // Senin-Minggu
+  bulan:     () => { const n = new Date(); return [new Date(n.getFullYear(), n.getMonth(), 1), akhirBulan(n.getFullYear(), n.getMonth())]; },
+  bulanlalu: () => { const n = new Date(); return [new Date(n.getFullYear(), n.getMonth() - 1, 1), akhirBulan(n.getFullYear(), n.getMonth() - 1)]; },
+  kuartal:   () => { const n = new Date(), q = Math.floor(n.getMonth() / 3) * 3; return [new Date(n.getFullYear(), q, 1), akhirBulan(n.getFullYear(), q + 2)]; },
+  tahun:     () => { const y = new Date().getFullYear(); return [new Date(y, 0, 1), new Date(y, 11, 31)]; },
+  tahunlalu: () => { const y = new Date().getFullYear() - 1; return [new Date(y, 0, 1), new Date(y, 11, 31)]; },
+};
+const OPSI = [['hari','Hari Ini'],['minggu','Minggu Ini'],['bulan','Bulan Ini'],['bulanlalu','Bulan Lalu'],['kuartal','Kuartal Ini'],['tahun','Tahun Ini'],['tahunlalu','Tahun Lalu'],['pilihbulan','Pilih Bulan…'],['custom','Custom']];
+$('#periode').innerHTML = OPSI.map(([k, t]) => `<option value="${k}">${t}</option>`).join('');
+let bulanPilih = null;      // { y, m } dari pemilih bulan
+let periodeSebelum = 'hari';
+
+function rentangAktif(){
+  const k = $('#periode').value;
+  if (k === 'custom') return [$('#dari').value, $('#sampai').value];
+  if (k === 'pilihbulan' && bulanPilih) return [ymd(new Date(bulanPilih.y, bulanPilih.m, 1)), ymd(akhirBulan(bulanPilih.y, bulanPilih.m))];
+  const [a, b] = (PRESET[k] || PRESET.hari)(); return [ymd(a), ymd(b)];
+}
+function tampilRentang(){
+  const [a, b] = rentangAktif(); const k = $('#periode').value;
+  $('#boxCustom').classList.toggle('hide', k !== 'custom');
+  $('#rentang').textContent = a && b ? (a === b ? tglPanjang(a) : `${tglPanjang(a)} – ${tglPanjang(b)}`) : '';
+  if (k !== 'custom') { $('#dari').value = a; $('#sampai').value = b; }   // custom dimulai dari rentang terakhir
+}
+$('#periode').addEventListener('change', () => {
+  const k = $('#periode').value;
+  if (k === 'pilihbulan') { bukaBulan(); return; }
+  periodeSebelum = k; tampilRentang(); if (k !== 'custom') muat(false);
+});
 $('#muat').addEventListener('click', () => muat(false));
+
+/* pemilih bulan (popup seperti Zahir) */
+let mmTahun = new Date().getFullYear(), mmBulan = new Date().getMonth();
+const NAMA_BLN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+function gambarBulan(){
+  $('#mmTitle').textContent = `${NAMA_BLN[mmBulan]} ${mmTahun}`; $('#mmYear').textContent = mmTahun;
+  $('#mmGrid').innerHTML = NAMA_BLN.map((n, i) => `<button type="button" class="${i === mmBulan ? 'on' : ''}" data-m="${i}">${n}</button>`).join('');
+  $('#mmGrid').querySelectorAll('button').forEach(b => b.onclick = () => { mmBulan = +b.dataset.m; gambarBulan(); });
+}
+function bukaBulan(){ if (bulanPilih) { mmTahun = bulanPilih.y; mmBulan = bulanPilih.m; } gambarBulan(); $('#mm').classList.remove('hide'); }
+function tutupBulan(){ $('#mm').classList.add('hide'); if ($('#periode').value === 'pilihbulan' && !bulanPilih) $('#periode').value = periodeSebelum; tampilRentang(); }
+$('#btnKal').onclick = bukaBulan;
+$('#mmPrev').onclick = () => { mmTahun--; gambarBulan(); };
+$('#mmNext').onclick = () => { mmTahun++; gambarBulan(); };
+$('#mmNow').onclick = () => { const n = new Date(); mmTahun = n.getFullYear(); mmBulan = n.getMonth(); gambarBulan(); };
+$('#mmCancel').onclick = tutupBulan;
+$('#mm').addEventListener('click', e => { if (e.target.id === 'mm') tutupBulan(); });
+$('#mmOk').onclick = () => {
+  bulanPilih = { y: mmTahun, m: mmBulan };
+  $('#periode').querySelector('option[value="pilihbulan"]').textContent = `${NAMA_BLN[mmBulan]} ${mmTahun}`;
+  $('#periode').value = 'pilihbulan'; periodeSebelum = 'pilihbulan'; $('#mm').classList.add('hide'); tampilRentang(); muat(false);
+};
+$('#periode').value = 'hari'; tampilRentang();
 
 async function muat(silent){
   const stEl = $('#status'); stEl.className = ''; stEl.textContent = 'Memuat...';
   try {
-    const r = await fetch(`/api/dashboard?tahun=${$('#tahun').value}&tanggal=${$('#tanggal').value}`, { headers: headersData() });
+    tampilRentang();
+    const [dari, sampai] = rentangAktif();
+    if (!dari || !sampai) throw new Error('Isi tanggal Dari dan Sampai');
+    const r = await fetch(`/api/dashboard?dari=${dari}&sampai=${sampai}`, { headers: headersData() });
     const d = await r.json();
     if (r.status === 401) { S.del('sess'); throw new Error(d.error || 'Sesi habis, silakan masuk lagi'); }
     if (!r.ok) throw new Error(d.error || r.statusText);
@@ -180,7 +236,9 @@ function gambar(d){
     $('#diag').open = true; if ($('#akunTbl').classList.contains('hide')) $('#btnAkun').click();
   }
   const baris = (k, v, cls='') => `<div class="baris ${cls}"><span class="k">${esc(k)}</span><span class="v">: Rp ${rp(v)}</span></div>`;
-  $('#boxSaldo').innerHTML = baris('Saldo Tunai', d.tunai) + baris('Saldo Rekening', d.rekening) + baris('Saldo Total', d.total, 'total');
+  const rentang = d.dari === d.tanggal ? tglPanjang(d.tanggal) : `${tglPanjang(d.dari)} – ${tglPanjang(d.tanggal)}`;
+  $('#boxSaldo').innerHTML = baris('Saldo Tunai', d.tunai) + baris('Saldo Rekening', d.rekening) + baris('Saldo Total', d.total, 'total')
+    + `<div class="baris sub"><span class="k">Perubahan kas (${esc(rentang)})</span><span class="v">${d.perubahan < 0 ? '-' : '+'}Rp ${rp(Math.abs(d.perubahan))}</span></div>`;
   $('#boxKategori').innerHTML = kat.map(k => baris(k.nama, k.saldo)).join('');
 }
 

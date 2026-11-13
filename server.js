@@ -118,7 +118,7 @@ function cekKolom(rows) {
 }
 const kategoriDari = r => KATEGORI.findIndex(k => k.akun.test(`${r.kode} ${r.nama}`) || (r.dimensi && k.dimensi.test(r.dimensi))); // -1 = tak terkategori
 
-function hitung(mutasi, tahun, tanggal) {
+function hitung(mutasi, tahun, tanggal, dari) {
   const rows = mutasi.map(r => ({ tanggal: tgl(r.tanggal), kode: r.kode ?? '', nama: r.nama ?? '', dimensi: r.dimensi ?? '', nilai: angka(r.nilai) })).filter(r => r.tanggal);
   rows.forEach(r => { r.kat = kategoriDari(r); r.tunai = TUNAI_REGEX.test(r.nama); });
   const sampaiTgl = batas => rows.filter(r => r.tanggal <= batas);
@@ -145,7 +145,10 @@ function hitung(mutasi, tahun, tanggal) {
     x.saldo += r.nilai; per.set(key, x);
   }
   const akun = [...per.values()].map(x => ({ ...x, saldo: Math.round(x.saldo) })).sort((a, b) => a.kode.localeCompare(b.kode));
-  return { tahun, tanggal, bulanan, kategori, taktegori, tunai, rekening: total - tunai, total, akun, jumlahBaris: mutasi.length, dibuang: mutasi.length - rows.length };
+  // Perubahan kas selama periode = saldo akhir - saldo sehari sebelum "dari"
+  const sebelum = new Date(Date.UTC(+dari.slice(0, 4), +dari.slice(5, 7) - 1, +dari.slice(8, 10) - 1)).toISOString().slice(0, 10);
+  const perubahan = total - Math.round(sampaiTgl(sebelum).reduce((s, r) => s + r.nilai, 0));
+  return { tahun, dari, tanggal, bulanan, kategori, taktegori, tunai, rekening: total - tunai, total, perubahan, akun, jumlahBaris: mutasi.length, dibuang: mutasi.length - rows.length };
 }
 
 // ---------- Server ----------
@@ -228,13 +231,17 @@ app.post('/auth/company', async (req, res) => {
 app.get('/api/dashboard', async (req, res) => {
   try {
     const ctx = ctxDari(req);
-    const tahun = parseInt(req.query.tahun, 10) || new Date().getFullYear();
-    const tanggal = /^\d{4}-\d{2}-\d{2}$/.test(req.query.tanggal || '') ? req.query.tanggal : `${tahun}-12-31`;
-    const awal = `${tahun}-01-01`;
-    const sampai = [tanggal, `${tahun}-12-31`].sort().pop();
-    const mutasi = DEMO ? mutasiDemo(tahun, sampai)
-      : cekKolom(await zsql(ctx, SQL_MUTASI.replaceAll('{{filterAkun}}', FILTER_AKUN).replaceAll('{{awal}}', awal).replaceAll('{{sampai}}', sampai).trim()));
-    res.json(hitung(mutasi, tahun, tanggal));
+    // Periode ala Zahir: dari-sampai. Saldo (pie/bar/kotak) per tanggal "sampai"; grafik garis = tahun dari "sampai".
+    const iso = v => /^\d{4}-\d{2}-\d{2}$/.test(v || '') ? v : null;
+    let sampai = iso(req.query.sampai) || new Date().toISOString().slice(0, 10);
+    let dari = iso(req.query.dari) || sampai;
+    if (dari > sampai) [dari, sampai] = [sampai, dari];
+    const tahun = parseInt(sampai.slice(0, 4), 10);
+    const awal = `${dari.slice(0, 4)}-01-01`;                       // saldo sebelum tanggal ini dikumpulkan jadi satu baris
+    const batasSql = [sampai, `${tahun}-12-31`].sort().pop();       // sampai akhir tahun, untuk grafik bulanan
+    const mutasi = DEMO ? mutasiDemo(tahun, batasSql)
+      : cekKolom(await zsql(ctx, SQL_MUTASI.replaceAll('{{filterAkun}}', FILTER_AKUN).replaceAll('{{awal}}', awal).replaceAll('{{sampai}}', batasSql).trim()));
+    res.json(hitung(mutasi, tahun, sampai, dari));
   } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
 });
 

@@ -78,7 +78,18 @@ details.adv summary{cursor:pointer;color:var(--muted);font-size:12px;margin:4px 
 .crumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);margin-bottom:14px}
 .crumb a{text-decoration:none} .crumb .cur{color:var(--ink);font-weight:500}
 .filter{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px}
-.filter .f{width:auto} .filter select{width:110px} .filter input[type=date]{width:170px}
+.filter .f{width:auto} .filter input[type=date]{width:170px}
+.per{display:flex;gap:8px;align-items:center} .per select{width:200px}
+button.ico{background:#fff;color:var(--brand);border:1px solid #cbd5e1;padding:8px 10px;line-height:0}
+.baris.sub{font-size:13px;opacity:.95;margin-top:6px}
+#mm{position:fixed;inset:0;background:rgba(15,27,45,.5);display:flex;align-items:center;justify-content:center;z-index:60}
+.mmbox{width:min(92vw,388px);background:#fff;border-radius:6px;overflow:hidden;box-shadow:0 20px 60px rgba(15,27,45,.35)}
+.mmhead{background:#1b7fe0;color:#fff;padding:20px 22px} .mmhead .t{font-size:30px;line-height:1.15} .mmhead .s{font-size:12px;margin-top:6px}
+.mmyear{display:flex;align-items:center;justify-content:space-between;padding:6px 22px;border-bottom:1px solid var(--line)}
+.mmyear span{font-size:20px} .mmyear button{background:none;color:var(--ink);font-size:26px;padding:2px 12px}
+.mmgrid{display:grid;grid-template-columns:repeat(3,1fr)} .mmgrid button{background:#fff;color:#44546a;border-radius:0;padding:20px 4px;font-weight:400;font-size:14px}
+.mmgrid button:hover{background:#eef5f9} .mmgrid button.on{background:#0b6a93;color:#fff}
+.mmfoot{display:flex;gap:6px;padding:10px 14px;align-items:center} .mmfoot button{background:none;color:#0e7fb8;font-weight:600;font-size:13px;letter-spacing:.04em;padding:10px 12px}
 #status{color:var(--muted);font-size:12px;padding-bottom:10px} #status.bad{color:var(--bad)}
 .kartu{background:var(--card);border-radius:6px;padding:8px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
@@ -197,8 +208,14 @@ details.adv summary{cursor:pointer;color:var(--muted);font-size:12px;margin:4px 
   <div class="page hide" id="pgDash">
     <div class="crumb"><a href="#" id="crumbCo">Perusahaan</a> › <span class="cur" id="dashCo"></span> › <span class="cur">Kas dan Saldo</span></div>
     <div class="filter">
-      <div class="f"><label>Tahun</label><select id="tahun"></select></div>
-      <div class="f"><label>Tanggal</label><input type="date" id="tanggal"></div>
+      <div class="f"><label>Periode</label>
+        <div class="per"><select id="periode"></select>
+          <button type="button" class="ico" id="btnKal" title="Pilih bulan" aria-label="Pilih bulan"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M7 2v2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2H7zm-2 8h14v9H5v-9zm2 2v4h4v-4H7z"/></svg></button></div>
+        <div class="prev" id="rentang" style="margin-top:4px"></div></div>
+      <div class="f hide" id="boxCustom" style="display:flex;gap:12px">
+        <div><label>Dari</label><input type="date" id="dari"></div>
+        <div><label>Sampai</label><input type="date" id="sampai"></div>
+      </div>
       <button id="muat">Muat</button>
       <span id="status"></span>
     </div>
@@ -222,6 +239,14 @@ details.adv summary{cursor:pointer;color:var(--muted);font-size:12px;margin:4px 
     </details>
   </div>
 </section>
+
+<!-- pemilih bulan -->
+<div id="mm" class="hide"><div class="mmbox" role="dialog" aria-label="Pilih bulan">
+  <div class="mmhead"><div class="t" id="mmTitle"></div><div class="s">Pilih Bulan</div></div>
+  <div class="mmyear"><button type="button" id="mmPrev" aria-label="Tahun sebelumnya">&#8249;</button><span id="mmYear"></span><button type="button" id="mmNext" aria-label="Tahun berikutnya">&#8250;</button></div>
+  <div class="mmgrid" id="mmGrid"></div>
+  <div class="mmfoot"><button type="button" id="mmNow">BULAN INI</button><span style="flex:1"></span><button type="button" id="mmCancel">BATAL</button><button type="button" id="mmOk">OK</button></div>
+</div></div>
 
 <div id="ov" class="hide"><div class="bx"><div class="t" id="ovTitle"></div><div class="s" id="ovSub"></div></div></div>
 
