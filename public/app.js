@@ -170,10 +170,31 @@ function gambar(d){
     plotOptions: { column: { dataLabels: { enabled: true, formatter(){ return rp(this.y); }, style: { fontSize: '10px', fontWeight: 'normal' } } } },
     series: [{ name: 'Saldo', colorByPoint: true, data: kat.map(k => ({ y: k.saldo, color: k.warna })) }],
   });
+  // diagnosa
+  $('#diagInfo').textContent = `${d.jumlahBaris} baris mutasi diterima dari zsql` + (d.dibuang ? `, ${d.dibuang} baris dibuang karena tanggalnya tidak terbaca` : '') + `. Saldo dihitung sampai ${judulTgl}.`;
+  $('#diagBody').innerHTML = d.akun.length ? d.akun.map(a => `<tr><td class="mono">${esc(a.kode)}</td><td>${esc(a.nama)}</td><td>${esc(a.dimensi)}</td><td>${a.jenis}</td><td>${esc(a.kategori)}</td><td class="num" style="text-align:right">${rp(a.saldo)}</td></tr>`).join('')
+    : '<tr><td colspan="6" class="empty">Tidak ada akun kas/bank yang terbaca.</td></tr>';
+  if (!d.jumlahBaris) {
+    $('#catatan').classList.remove('hide');
+    $('#catatan').textContent = 'zsql tidak mengembalikan satu pun baris kas/bank. Biasanya FILTER_AKUN di config.js belum cocok dengan akun perusahaan ini; lihat daftar akun aset di bawah dan sesuaikan.';
+    $('#diag').open = true; if ($('#akunTbl').classList.contains('hide')) $('#btnAkun').click();
+  }
   const baris = (k, v, cls='') => `<div class="baris ${cls}"><span class="k">${esc(k)}</span><span class="v">: Rp ${rp(v)}</span></div>`;
   $('#boxSaldo').innerHTML = baris('Saldo Tunai', d.tunai) + baris('Saldo Rekening', d.rekening) + baris('Saldo Total', d.total, 'total');
   $('#boxKategori').innerHTML = kat.map(k => baris(k.nama, k.saldo)).join('');
 }
+
+$('#btnAkun').addEventListener('click', async () => {
+  $('#akunErr').textContent = ''; $('#btnAkun').disabled = true;
+  try {
+    const r = await fetch('/api/akun', { headers: headersData() }); const rows = await r.json();
+    if (!r.ok) throw new Error(rows.error || r.statusText);
+    $('#akunBody').innerHTML = rows.length ? rows.map(a => `<tr><td class="mono">${esc(a.kode)}</td><td>${esc(a.nama)}</td><td>${esc(a.subklas)}</td><td class="num" style="text-align:right">${esc(a.jumlah_baris)}</td><td class="num" style="text-align:right">${rp(parseFloat(a.saldo) || 0)}</td></tr>`).join('')
+      : '<tr><td colspan="5" class="empty">Tidak ada akun berklasifikasi 1.</td></tr>';
+    $('#akunTbl').classList.remove('hide');
+  } catch (e) { $('#akunErr').textContent = e.message; }
+  finally { $('#btnAkun').disabled = false; }
+});
 
 /* ---------- pulihkan sesi (refresh halaman) ---------- */
 (function restore(){

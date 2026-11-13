@@ -87,6 +87,9 @@ details.adv summary{cursor:pointer;color:var(--muted);font-size:12px;margin:4px 
 .box.biru{background:var(--biru);font-size:18px} .box.hijau{background:var(--hijau);font-size:15px;font-weight:600}
 .baris{display:flex;gap:10px;padding:3px 0} .baris .k{flex:1} .baris .v{min-width:150px;text-align:right;font-variant-numeric:tabular-nums}
 .baris.total{border-top:1px solid rgba(255,255,255,.5);margin-top:4px;padding-top:6px;font-weight:700}
+.diag{margin-top:14px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+.diag summary{cursor:pointer;font-weight:600;color:var(--muted)}
+.diag td.num,.diag th.num{text-align:right;font-variant-numeric:tabular-nums}
 .catatan{margin-top:10px;color:#8a5a00;background:#fff4d6;padding:8px 12px;border-radius:6px}
 @media (max-width:820px){.grid2,.kotak{grid-template-columns:1fr}.page{padding:14px}}
 
@@ -209,6 +212,14 @@ details.adv summary{cursor:pointer;color:var(--muted);font-size:12px;margin:4px 
       <div class="box hijau" id="boxKategori"></div>
     </div>
     <div class="catatan hide" id="catatan"></div>
+    <details class="diag" id="diag">
+      <summary>Diagnosa: akun kas/bank yang terhitung</summary>
+      <div class="prev" id="diagInfo" style="margin:6px 0 10px"></div>
+      <table class="co"><thead><tr><th>Kode</th><th>Akun</th><th>Dimensi / Proyek</th><th>Jenis</th><th>Kategori</th><th style="text-align:right">Saldo</th></tr></thead><tbody id="diagBody"></tbody></table>
+      <div style="margin-top:12px"><button class="ghost" id="btnAkun" type="button">Lihat semua akun aset (untuk menyesuaikan FILTER_AKUN)</button></div>
+      <table class="co hide" id="akunTbl" style="margin-top:10px"><thead><tr><th>Kode</th><th>Akun</th><th>Sub-klasifikasi</th><th style="text-align:right">Baris jurnal</th><th style="text-align:right">Saldo</th></tr></thead><tbody id="akunBody"></tbody></table>
+      <div class="err" id="akunErr"></div>
+    </details>
   </div>
 </section>
 

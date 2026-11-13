@@ -3,7 +3,7 @@
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
-const { SQL_MUTASI, TUNAI_REGEX, KATEGORI, WARNA } = require('./config');
+const { SQL_MUTASI, SQL_AKUN_ASET, FILTER_AKUN, TUNAI_REGEX, KATEGORI, WARNA } = require('./config');
 const { mutasiDemo } = require('./demo');
 
 const PORT = process.env.PORT || 3000;
@@ -104,8 +104,17 @@ function angka(v) {
   return Number.isFinite(n) ? n : 0;
 }
 function tgl(v) {
-  const m = String(v ?? '').match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return `${m[1]}-${m[2]}-${m[3]}`;
-  const d = String(v ?? '').match(/^(\d{2})[/-](\d{2})[/-](\d{4})/); return d ? `${d[3]}-${d[2]}-${d[1]}` : null; // dd/mm/yyyy
+  const s = String(v ?? '').trim();
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  const d = s.match(/^(\d{2})[/-](\d{2})[/-](\d{4})/); if (d) return `${d[3]}-${d[2]}-${d[1]}`; // dd/mm/yyyy
+  const t = s && new Date(s); // format lain, mis. "Oct 24, 2026"
+  return t && !isNaN(t) ? `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}` : null;
+}
+// zsql kadang membalas galat SQL sebagai tabel biasa (HTTP 200): pastikan kolom yang diharapkan ada, kalau tidak tampilkan isinya
+function cekKolom(rows) {
+  if (rows.length && !('tanggal' in rows[0] && 'nilai' in rows[0]))
+    throw new Error('zsql tidak mengembalikan kolom yang diharapkan (tanggal, kode, nama, dimensi, nilai). Isi respons: ' + JSON.stringify(rows[0]).slice(0, 500));
+  return rows;
 }
 const kategoriDari = r => KATEGORI.findIndex(k => k.akun.test(`${r.kode} ${r.nama}`) || (r.dimensi && k.dimensi.test(r.dimensi))); // -1 = tak terkategori
 
@@ -128,7 +137,15 @@ function hitung(mutasi, tahun, tanggal) {
   const taktegori = Math.round(aktif.filter(r => r.kat === -1).reduce((s, r) => s + r.nilai, 0));
   const tunai = Math.round(aktif.filter(r => r.tunai).reduce((s, r) => s + r.nilai, 0));
   const total = Math.round(aktif.reduce((s, r) => s + r.nilai, 0));
-  return { tahun, tanggal, bulanan, kategori, taktegori, tunai, rekening: total - tunai, total };
+  // Diagnosa: akun/dimensi apa yang terhitung dan masuk kategori mana (untuk memeriksa pola KATEGORI)
+  const per = new Map();
+  for (const r of aktif) {
+    const key = `${r.kode}|${r.dimensi}`;
+    const x = per.get(key) || { kode: r.kode, nama: r.nama, dimensi: r.dimensi, kategori: r.kat >= 0 ? KATEGORI[r.kat].nama : '(belum terkategori)', jenis: r.tunai ? 'Tunai' : 'Rekening', saldo: 0 };
+    x.saldo += r.nilai; per.set(key, x);
+  }
+  const akun = [...per.values()].map(x => ({ ...x, saldo: Math.round(x.saldo) })).sort((a, b) => a.kode.localeCompare(b.kode));
+  return { tahun, tanggal, bulanan, kategori, taktegori, tunai, rekening: total - tunai, total, akun, jumlahBaris: mutasi.length, dibuang: mutasi.length - rows.length };
 }
 
 // ---------- Server ----------
@@ -215,8 +232,18 @@ app.get('/api/dashboard', async (req, res) => {
     const tanggal = /^\d{4}-\d{2}-\d{2}$/.test(req.query.tanggal || '') ? req.query.tanggal : `${tahun}-12-31`;
     const awal = `${tahun}-01-01`;
     const sampai = [tanggal, `${tahun}-12-31`].sort().pop();
-    const mutasi = DEMO ? mutasiDemo(tahun, sampai) : await zsql(ctx, SQL_MUTASI.replaceAll('{{awal}}', awal).replaceAll('{{sampai}}', sampai));
+    const mutasi = DEMO ? mutasiDemo(tahun, sampai)
+      : cekKolom(await zsql(ctx, SQL_MUTASI.replaceAll('{{filterAkun}}', FILTER_AKUN).replaceAll('{{awal}}', awal).replaceAll('{{sampai}}', sampai).trim()));
     res.json(hitung(mutasi, tahun, tanggal));
+  } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
+});
+
+// Daftar semua akun aset (klasifikasi 1) beserta saldo, untuk memilih/menyesuaikan FILTER_AKUN
+app.get('/api/akun', async (req, res) => {
+  try {
+    const ctx = ctxDari(req);
+    if (DEMO) return res.json([{ kode: '1-1101', nama: 'Kas Kecil', subklas: 'Kas & Bank', jumlah_baris: '12', saldo: '5000000.00' }, { kode: '1-2101', nama: 'Piutang Usaha', subklas: 'Piutang', jumlah_baris: '30', saldo: '-2000000.00' }]);
+    res.json(await zsql(ctx, SQL_AKUN_ASET.trim()));
   } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
 });
 
