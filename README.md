@@ -13,6 +13,13 @@ npm install
 npm run demo     # login apa saja diterima, data contoh -> http://127.0.0.1:3000
 npm start        # pakai server Zahir sungguhan
 ```
+Alamat **Server** di layar login bisa berupa domain atau IP publik, dengan/tanpa port dan skema:
+`go.zahironline.com`, `13.212.173.222`, `13.212.173.222:8989`, `http://13.212.173.222:8989`, `https://erp.contoh.com:8443`.
+Tanpa skema: IP dianggap `http://`, domain dianggap `https://`. Di versi online (Vercel) alamat lokal/privat
+(localhost, 10.x, 172.16-31.x, 192.168.x, 169.254.x) ditolak; untuk server di jaringan lokal jalankan aplikasi di jaringan yang sama.
+Perhatian: koneksi `http://` ke server berarti email/password dari aplikasi ke server Zahir tidak terenkripsi di jaringan.
+Slug perusahaan tidak wajib (ZahirERP lewat IP); bila ada dikirim sebagai header Slug, dan ID perusahaan sebagai X-Company-Id.
+
 Opsional (env): `PORT`, `HOST`, `ZAHIR_INSECURE_TLS=1` (server on-premise self-signed),
 `ZAHIR_ALLOWED_HOSTS`, `LOGIN_RSA_PRIVATE_KEY` (wajib di Vercel agar enkripsi password jalan).
 

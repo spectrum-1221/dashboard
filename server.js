@@ -5,6 +5,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { SQL_MUTASI, SQL_AKUN_ASET, FILTER_AKUN, TUNAI_REGEX, KATEGORI, WARNA } = require('./config');
 const { mutasiDemo } = require('./demo');
+const { normServer: urlNorm } = require('./urlcheck');
 
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '127.0.0.1'; // hanya lokal; ganti 0.0.0.0 bila sengaja dibuka ke jaringan
@@ -27,21 +28,8 @@ const PUB_JWK = publicKey ? publicKey.export({ format: 'jwk' }) : null;
 const decryptPassword = b64 => crypto.privateDecrypt(
   { key: privateKey, padding: crypto.constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256' }, Buffer.from(b64, 'base64')).toString('utf8');
 
-function normServer(s) {
-  s = String(s || '').trim().replace(/\/+$/, '');
-  if (!s) throw new Error('Alamat server kosong');
-  if (!/^https?:\/\//i.test(s)) s = 'https://' + s;
-  if (!/^https?:\/\/[\w.-]+(:\d{1,5})?$/i.test(s)) throw new Error('Alamat server tidak valid: ' + s);
-  if (IS_VERCEL || process.env.ZAHIR_ALLOWED_HOSTS) { // versi online: wajib https, bukan alamat lokal/privat
-    const host = s.replace(/^https?:\/\//i, '').replace(/:\d+$/, '').toLowerCase();
-    if (!/^https:/i.test(s)) throw new Error('Versi online hanya bisa terhubung lewat https://');
-    const allow = String(process.env.ZAHIR_ALLOWED_HOSTS || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean);
-    if (allow.length) { if (!allow.some(d => host === d || host.endsWith('.' + d))) throw new Error('Domain tidak diizinkan. Domain yang diizinkan: ' + allow.join(', ')); }
-    else if (!host.includes('.') || /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || /\.(local|localhost|internal|lan|intranet)$/.test(host))
-      throw new Error('Versi online hanya bisa terhubung ke domain publik. Untuk server lokal jalankan di komputer sendiri.');
-  }
-  return s;
-}
+const ALLOWED = String(process.env.ZAHIR_ALLOWED_HOSTS || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean);
+const normServer = v => urlNorm(v, { online: IS_VERCEL || ALLOWED.length > 0, allow: ALLOWED });
 const clientB64 = v => { v = String(v || '').trim(); return !v ? DEFAULT_CLIENT_B64 : v.includes(':') ? Buffer.from(v).toString('base64') : v; };
 
 function explain(e, url) {
@@ -80,13 +68,15 @@ function parseRespons(teks) {
 }
 function ctxDari(req) {
   const token = req.get('x-zahir-token'); if (!token) throw Object.assign(new Error('Belum login'), { status: 401 });
-  const slug = (req.get('x-zahir-slug') || '').trim();
-  if (!slug && !DEMO) throw Object.assign(new Error('Perusahaan belum dipilih'), { status: 400 });
-  return { token, slug, client: req.get('x-zahir-client'), base: DEMO ? '' : normServer(req.get('x-zahir-base')) };
+  const slug = (req.get('x-zahir-slug') || '').trim(), company = (req.get('x-zahir-company') || '').trim();
+  if (!slug && !company && !DEMO) throw Object.assign(new Error('Perusahaan belum dipilih'), { status: 400 });
+  return { token, slug, company, client: req.get('x-zahir-client'), base: DEMO ? '' : normServer(req.get('x-zahir-base')) };
 }
 async function zsql(ctx, query) {
   const body = new FormData(); body.append('query', query);
-  const headers = { Authorization: 'Bearer ' + ctx.token, client: clientB64(ctx.client), Slug: ctx.slug, 'X-Slug': ctx.slug };
+  const headers = { Authorization: 'Bearer ' + ctx.token, client: clientB64(ctx.client) };
+  if (ctx.slug) { headers.Slug = ctx.slug; headers['X-Slug'] = ctx.slug; }
+  if (ctx.company) headers['X-Company-Id'] = ctx.company;
   const r = await zfetch(`${ctx.base}/api/v2/zsql?is_show_as_table=true`, headers, 'POST', body);
   if (r.status === 401) throw Object.assign(new Error('Sesi habis atau token ditolak (401). Keluar lalu masuk lagi.'), { status: 401 });
   if (r.status >= 300) throw new Error(`zsql HTTP ${r.status}: ${r.text.slice(0, 300)}`);

@@ -12,7 +12,7 @@ const st = { server:null, token:null, client:'', me:null, companies:[], coEndpoi
 const ov = { show(t, s=''){ $('#ovTitle').innerHTML = '<span class="spin"></span> ' + esc(t); $('#ovSub').textContent = s; $('#ov').classList.remove('hide'); }, hide(){ $('#ov').classList.add('hide'); } };
 function showPage(id){ for (const p of ['pgCo','pgDash']) $('#'+p).classList.toggle('hide', p !== id); $('#btnDb').classList.toggle('hide', id === 'pgCo'); window.scrollTo(0,0); }
 async function post(url, body, extra={}){ const r = await fetch(url, { method:'POST', headers:{ 'Content-Type':'application/json', ...extra }, body:JSON.stringify(body) }); const j = await r.json(); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status)); return j; }
-function headersData(){ const h = { 'x-zahir-base': st.dataBase, 'x-zahir-token': st.token, 'x-zahir-slug': st.slug }; if (st.client) h['x-zahir-client'] = st.client; return h; }
+function headersData(){ const h = { 'x-zahir-base': st.dataBase, 'x-zahir-token': st.token, 'x-zahir-slug': st.slug }; if (st.client) h['x-zahir-client'] = st.client; if (st.company?.id) h['x-zahir-company'] = st.company.id; return h; }
 
 /* cari nilai primitif dari daftar nama kunci (struktur API bisa beda per versi) */
 function pick(obj, keys, depth=0, seen=new Set()){
