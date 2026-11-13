@@ -98,6 +98,27 @@ button.ico{background:#fff;color:var(--brand);border:1px solid #cbd5e1;padding:8
 .box.biru{background:var(--biru);font-size:18px} .box.hijau{background:var(--hijau);font-size:15px;font-weight:600}
 .baris{display:flex;gap:10px;padding:3px 0} .baris .k{flex:1} .baris .v{min-width:150px;text-align:right;font-variant-numeric:tabular-nums}
 .baris.total{border-top:1px solid rgba(255,255,255,.5);margin-top:4px;padding-top:6px;font-weight:700}
+/* pengaturan kategori */
+.setcard{background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:14px}
+.setcard h3{margin:0 0 6px;font-size:16px}
+.kat{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:10px;background:#fafcfe}
+.kat-h{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.kat-h .no{width:24px;height:24px;border-radius:50%;background:var(--brand2);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:12px;flex:none}
+.kat-h .k-nama{flex:1;font-weight:600}
+.kat-h input[type=color]{width:42px;height:36px;padding:2px;flex:none}
+.ar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0}
+.ar .or{width:36px;font-size:11px;color:var(--muted);font-weight:600;flex:none}
+.ar select{width:auto;min-width:150px} .ar .a-val{flex:1;min-width:200px}
+.chips{flex:1;min-width:240px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;border:1px solid #cbd5e1;border-radius:6px;padding:4px 6px;background:#fff}
+.chip{display:inline-flex;gap:6px;align-items:center;background:#e4f1f9;color:#063e5c;border-radius:99px;padding:3px 4px 3px 10px;font-size:12.5px}
+.chip button{background:none;color:#063e5c;padding:0 6px;font-size:15px;line-height:1}
+.chips .a-add{border:0;outline:0;width:auto;flex:1;min-width:150px;padding:5px 4px}
+button.x{background:none;color:var(--muted);font-size:18px;padding:2px 8px;line-height:1}
+button.lnk{background:none;color:var(--brand);padding:4px 6px;font-weight:600;font-size:13px}
+button.lnk.bahaya,button.x:hover{color:var(--bad)}
+.setbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:4px 0 8px}
+.ghostlabel{display:inline-block;margin:0;padding:9px 14px;border:1px solid var(--brand);border-radius:6px;color:var(--brand);background:#fff;font-weight:500;font-size:14px;text-transform:none;letter-spacing:0;cursor:pointer}
+.diag select.atur{width:150px;padding:4px 6px;font-size:12px}
 .diag{margin-top:14px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px 14px}
 .diag summary{cursor:pointer;font-weight:600;color:var(--muted)}
 .diag td.num,.diag th.num{text-align:right;font-variant-numeric:tabular-nums}
@@ -217,6 +238,7 @@ button.ico{background:#fff;color:var(--brand);border:1px solid #cbd5e1;padding:8
         <div><label>Sampai</label><input type="date" id="sampai"></div>
       </div>
       <button id="muat">Muat</button>
+      <button class="ghost" id="btnSet" type="button">&#9881; Pengaturan kategori</button>
       <span id="status"></span>
     </div>
     <div class="kartu"><div id="garis" style="height:260px"></div></div>
@@ -232,13 +254,43 @@ button.ico{background:#fff;color:var(--brand);border:1px solid #cbd5e1;padding:8
     <details class="diag" id="diag">
       <summary>Diagnosa: akun kas/bank yang terhitung</summary>
       <div class="prev" id="diagInfo" style="margin:6px 0 10px"></div>
-      <table class="co"><thead><tr><th>Kode</th><th>Akun</th><th>Dimensi / Proyek</th><th>Jenis</th><th>Kategori</th><th style="text-align:right">Saldo</th></tr></thead><tbody id="diagBody"></tbody></table>
+      <table class="co"><thead><tr><th>Kode</th><th>Akun</th><th>Dimensi / Proyek</th><th>Jenis</th><th>Kategori</th><th style="text-align:right">Saldo</th><th>Atur</th></tr></thead><tbody id="diagBody"></tbody></table>
       <div style="margin-top:12px"><button class="ghost" id="btnAkun" type="button">Lihat semua akun aset (untuk menyesuaikan FILTER_AKUN)</button></div>
       <table class="co hide" id="akunTbl" style="margin-top:10px"><thead><tr><th>Kode</th><th>Akun</th><th>Sub-klasifikasi</th><th style="text-align:right">Baris jurnal</th><th style="text-align:right">Saldo</th></tr></thead><tbody id="akunBody"></tbody></table>
       <div class="err" id="akunErr"></div>
     </details>
   </div>
+
+  <!-- halaman 3: pengaturan kategori -->
+  <div class="page hide" id="pgSet">
+    <div class="crumb"><a href="#" id="setBack">Kas dan Saldo</a> › <span class="cur">Pengaturan kategori</span></div>
+    <div class="setcard">
+      <h3>Kategori dana</h3>
+      <p class="prev">Tiap baris kas/bank masuk ke kategori <b>pertama</b> (paling atas) yang cocok; urutan = prioritas, gunakan &#8593; &#8595;. Dalam satu kategori, aturan bersifat <b>ATAU</b>.
+        "Salah satu dari daftar" memilih akun/departemen/proyek persis (ketik atau pilih dari data yang sedang dimuat), "mengandung kata" memakai kata kunci dipisah koma, "regex" untuk pola.
+        Yang tidak cocok muncul sebagai "Belum terkategori".</p>
+      <div id="katList"></div>
+      <button type="button" class="lnk" data-act="addKat" style="margin-top:8px">+ Tambah kategori</button>
+    </div>
+    <div class="setcard">
+      <h3>Saldo Tunai</h3>
+      <p class="prev">Akun yang cocok dengan aturan ini dihitung sebagai <b>Saldo Tunai</b>; sisanya Saldo Rekening.</p>
+      <div id="tunaiRules"></div>
+    </div>
+    <div class="setbar">
+      <button id="setSave" type="button">Simpan dan terapkan</button>
+      <button id="setCancel" type="button" class="ghost">Batal</button>
+      <span style="flex:1"></span>
+      <button id="setReset" type="button" class="ghost">Kembalikan bawaan</button>
+      <button id="setExport" type="button" class="ghost">Ekspor JSON</button>
+      <label class="ghostlabel">Impor JSON<input type="file" id="setImport" accept="application/json,.json" hidden></label>
+    </div>
+    <div class="err" id="setErr"></div>
+    <div class="prev" style="margin-top:6px">Pengaturan tersimpan di browser ini, terpisah untuk tiap perusahaan. Untuk membagikannya ke pengguna/komputer lain, gunakan Ekspor dan Impor JSON.</div>
+  </div>
 </section>
+
+<datalist id="dl-akun"></datalist><datalist id="dl-departemen"></datalist><datalist id="dl-proyek"></datalist>
 
 <!-- pemilih bulan -->
 <div id="mm" class="hide"><div class="mmbox" role="dialog" aria-label="Pilih bulan">

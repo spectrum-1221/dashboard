@@ -15,7 +15,7 @@ const FILTER_AKUN = `
 `;
 
 // Satu query yang mengembalikan mutasi akun Kas/Bank per tanggal (jurnal berstatus approved).
-// Kolom hasil WAJIB: tanggal | kode | nama | dimensi | nilai   (nilai = debit - kredit)
+// Kolom hasil: tanggal | kode | nama | departemen | proyek | dimensi | nilai   (nilai = debit - kredit)
 // Placeholder: {{awal}} = 1 Januari tahun terpilih, {{sampai}} = tanggal terakhir yang dibutuhkan, {{filterAkun}}.
 // Transaksi sebelum {{awal}} dijadikan satu baris saldo awal bertanggal {{awal}} - 1 hari.
 // Dimensi = nama departemen dan/atau proyek pada baris jurnal (dipakai untuk menentukan kategori dana).
@@ -25,6 +25,8 @@ SELECT (CASE WHEN g.tanggal::date < DATE '{{awal}}' THEN DATE '{{awal}}' - 1
              ELSE g.tanggal::date END)                                              AS tanggal,
        k.code                                                                       AS kode,
        k.nama                                                                       AS nama,
+       COALESCE(d.nama, '')                                                         AS departemen,
+       COALESCE(p.namapekerjaan, '')                                                AS proyek,
        concat_ws(' / ', NULLIF(d.nama, ''), NULLIF(p.namapekerjaan, ''))            AS dimensi,
        SUM(COALESCE(jv.debit, 0) - COALESCE(jv.kredit, 0))::numeric(20,2)           AS nilai
 FROM   g_jurnal g
@@ -38,7 +40,7 @@ LEFT JOIN (SELECT DISTINCT ON (project_id) project_id, namapekerjaan
 WHERE  g.status = 'approved'
   AND  g.tanggal::date <= DATE '{{sampai}}'
   AND  ({{filterAkun}})
-GROUP BY 1, 2, 3, 4
+GROUP BY 1, 2, 3, 4, 5, 6
 `;
 
 // Daftar semua akun aset (klasifikasi 1) + jumlah baris jurnal, untuk membantu memilih FILTER_AKUN.
@@ -56,23 +58,29 @@ GROUP BY k.code, k.nama, 3
 ORDER BY k.code
 `;
 
-// Akun yang namanya cocok regex ini dianggap SALDO TUNAI, sisanya SALDO REKENING.
-const TUNAI_REGEX = /^(kas|petty)/i;
+// ---- Pengaturan kategori BAWAAN ----
+// Ini hanya titik awal. Tiap pemakai bisa mengubahnya dari menu "Pengaturan kategori" di dashboard
+// (tersimpan per perusahaan di browser, bisa diekspor/diimpor sebagai JSON).
+// Aturan: { by: 'akun' | 'kode' | 'departemen' | 'proyek', op: 'in' | 'contains' | 'regex', nilai }
+//   in       = sama dengan salah satu nilai terpilih (daftar; untuk 'akun' dicocokkan ke kode akun)
+//   contains = mengandung salah satu kata (pisah dengan koma)
+//   regex    = pola regex (tidak peka huruf besar/kecil)
+// Baris kas/bank masuk ke kategori PERTAMA yang cocok; sisanya "Belum terkategori".
+const pola = src => ['akun', 'departemen', 'proyek'].map(by => ({ by, op: 'regex', nilai: src }));
+const KONFIG_DEFAULT = {
+  kategori: [
+    { nama: 'Uang Kuliah',                            warna: '#7cb5ec', aturan: pola('kuliah|spp') },
+    { nama: 'Lainnya dari Mahasiswa',                 warna: '#434348', aturan: pola('^(?!.*non).*mahasiswa') },
+    { nama: 'Kerjasama, Hibah, Bantuan dan Beasiswa', warna: '#90ed7d', aturan: pola('kerjasama|hibah|bantuan|beasiswa') },
+    { nama: 'Kegiatan Usaha',                         warna: '#f7a35c', aturan: pola('usaha') },
+    { nama: 'Lainnya Non-Mahasiswa',                  warna: '#8085e9', aturan: pola('non.?mahasiswa') },
+    { nama: 'Petty Cash',                             warna: '#f15c80', aturan: pola('petty') },
+  ],
+  // Akun yang cocok dianggap SALDO TUNAI, sisanya SALDO REKENING.
+  tunai: [{ by: 'akun', op: 'regex', nilai: '^(kas|petty)' }],
+};
 
-// Enam kategori dana. Urutan di sini = urutan tampil di grafik dan kotak hijau.
-// Baris mutasi masuk ke kategori PERTAMA yang cocok, dicek terhadap
-// "kode nama" akun (akun) atau nama dimensi/proyek/departemen (dimensi).
-// Contoh pola di bawah hanya tebakan, ganti dengan nama akun/dimensi aslinya.
-const KATEGORI = [
-  { nama: 'Uang Kuliah',                            akun: /kuliah|spp/i,           dimensi: /uang kuliah|spp/i },
-  { nama: 'Lainnya dari Mahasiswa',                 akun: /^(?!.*non).*mahasiswa/i, dimensi: /^(?!.*non).*mahasiswa/i },
-  { nama: 'Kerjasama, Hibah, Bantuan dan Beasiswa', akun: /kerjasama|hibah|bantuan|beasiswa/i, dimensi: /kerjasama|hibah|bantuan|beasiswa/i },
-  { nama: 'Kegiatan Usaha',                         akun: /usaha/i,                dimensi: /usaha/i },
-  { nama: 'Lainnya Non-Mahasiswa',                  akun: /non.?mahasiswa/i,       dimensi: /non.?mahasiswa/i },
-  { nama: 'Petty Cash',                             akun: /petty/i,                dimensi: /petty/i },
-];
+// Palet cadangan bila warna kategori tidak valid
+const WARNA = ['#7cb5ec', '#434348', '#90ed7d', '#f7a35c', '#8085e9', '#f15c80', '#2b908f', '#e4d354', '#a6c96a', '#9a6fb0'];
 
-// Warna mengikuti palet Highcharts seperti di contoh.
-const WARNA = ['#7cb5ec', '#434348', '#90ed7d', '#f7a35c', '#8085e9', '#f15c80', '#999999'];
-
-module.exports = { SQL_MUTASI, SQL_AKUN_ASET, FILTER_AKUN, TUNAI_REGEX, KATEGORI, WARNA };
+module.exports = { SQL_MUTASI, SQL_AKUN_ASET, FILTER_AKUN, KONFIG_DEFAULT, WARNA };

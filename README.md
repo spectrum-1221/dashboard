@@ -28,8 +28,14 @@ Query memakai tabel bawaan Zahir Online yang sama dengan Zahir Insight (`g_jurna
 hanya jurnal berstatus `approved`.
 1. `FILTER_AKUN`: akun mana yang dihitung sebagai Kas/Bank. Bawaan: klasifikasi 1 (aset) yang nama akun/sub-klasifikasinya memuat
    kas, bank, atau petty. Kalau ada akun yang tidak terambil, ubah, mis. `k.code IN ('1-1100','1-1200')`.
-2. `KATEGORI`: pola regex nama akun / dimensi (departemen dan proyek) untuk 6 kategori dana. Saldo yang tidak cocok muncul sebagai "Belum terkategori".
-3. `TUNAI_REGEX`: akun yang dianggap tunai (sisanya rekening).
+
+Kategori dana dan Saldo Tunai **tidak lagi diubah di `config.js`**, melainkan lewat tombol **Pengaturan kategori** di dashboard:
+- Tambah, hapus, ganti nama, beri warna, dan urutkan kategori (urutan = prioritas; baris masuk ke kategori pertama yang cocok).
+- Tiap kategori punya aturan (ATAU): berdasarkan **Akun**, **Kode akun**, **Departemen**, atau **Proyek**, dengan cara
+  *salah satu dari daftar* (pilih/ketik, dari data yang sedang dimuat), *mengandung kata*, atau *regex*.
+- Aturan **Saldo Tunai** diatur di halaman yang sama.
+- Tersimpan di browser, terpisah per perusahaan. Ekspor/Impor JSON untuk membagikan ke pemakai lain. `config.js` (`KONFIG_DEFAULT`) hanya nilai awal.
+- Di tabel Diagnosa, kolom **Atur** memindahkan satu akun ke kategori lain dengan sekali klik (bila masih tertahan kategori di atasnya, ada tawaran menaikkan prioritas).
 
 Di dashboard ada panel **Diagnosa** (di bagian bawah): daftar akun/dimensi yang terhitung beserta kategorinya, dan tombol
 "Lihat semua akun aset" untuk memilih `FILTER_AKUN`. Bila zsql membalas galat SQL, pesannya ditampilkan apa adanya.

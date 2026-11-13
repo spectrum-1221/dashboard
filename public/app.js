@@ -10,7 +10,7 @@ const L = { get(k){ try{ return JSON.parse(localStorage.getItem('zdk.'+k)); }cat
 const st = { server:null, token:null, client:'', me:null, companies:[], coEndpoint:null, dataBase:null, slug:'', company:null };
 
 const ov = { show(t, s=''){ $('#ovTitle').innerHTML = '<span class="spin"></span> ' + esc(t); $('#ovSub').textContent = s; $('#ov').classList.remove('hide'); }, hide(){ $('#ov').classList.add('hide'); } };
-function showPage(id){ for (const p of ['pgCo','pgDash']) $('#'+p).classList.toggle('hide', p !== id); $('#btnDb').classList.toggle('hide', id === 'pgCo'); window.scrollTo(0,0); }
+function showPage(id){ for (const p of ['pgCo','pgDash','pgSet']) $('#'+p).classList.toggle('hide', p !== id); $('#btnDb').classList.toggle('hide', id === 'pgCo'); window.scrollTo(0,0); }
 async function post(url, body, extra={}){ const r = await fetch(url, { method:'POST', headers:{ 'Content-Type':'application/json', ...extra }, body:JSON.stringify(body) }); const j = await r.json(); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status)); return j; }
 function headersData(){ const h = { 'x-zahir-base': st.dataBase, 'x-zahir-token': st.token, 'x-zahir-slug': st.slug }; if (st.client) h['x-zahir-client'] = st.client; if (st.company?.id) h['x-zahir-company'] = st.company.id; return h; }
 
@@ -193,7 +193,8 @@ async function muat(silent){
     tampilRentang();
     const [dari, sampai] = rentangAktif();
     if (!dari || !sampai) throw new Error('Isi tanggal Dari dan Sampai');
-    const r = await fetch(`/api/dashboard?dari=${dari}&sampai=${sampai}`, { headers: headersData() });
+    await defReady;
+    const r = await fetch('/api/dashboard', { method: 'POST', headers: { 'Content-Type': 'application/json', ...headersData() }, body: JSON.stringify({ dari, sampai, konfig: kfgAktif() }) });
     const d = await r.json();
     if (r.status === 401) { S.del('sess'); throw new Error(d.error || 'Sesi habis, silakan masuk lagi'); }
     if (!r.ok) throw new Error(d.error || r.statusText);
@@ -211,8 +212,12 @@ function gambar(d){
   });
   const kat = d.kategori.slice();
   if (d.taktegori) kat.push({ nama: 'Belum terkategori', saldo: d.taktegori, warna: '#999999' });
-  $('#catatan').classList.toggle('hide', !d.taktegori);
-  $('#catatan').textContent = d.taktegori ? `Ada saldo Rp ${rp(d.taktegori)} yang belum cocok ke kategori mana pun. Sesuaikan pola KATEGORI di config.js.` : '';
+  const cat = [];
+  if (d.taktegori) cat.push(`Ada saldo Rp ${rp(d.taktegori)} yang belum cocok ke kategori mana pun. Atur lewat tombol "Pengaturan kategori", atau pindahkan akunnya di tabel Diagnosa.`);
+  (d.peringatan || []).forEach(w => cat.push(w));
+  $('#catatan').classList.toggle('hide', !cat.length);
+  $('#catatan').textContent = cat.join(' ');
+  DATAOPSI = d.opsi || DATAOPSI; ultimaAkun = d.akun || []; isiDatalist();
   Highcharts.chart('pie', {
     chart: { type: 'pie' }, title: { text: 'Persentase Dana Saldo Tanggal ' + judulTgl, style: { fontSize: '14px' } },
     tooltip: { pointFormat: '<b>{point.percentage:.1f}%</b><br>Rp {point.y:,.0f}' },
@@ -228,8 +233,9 @@ function gambar(d){
   });
   // diagnosa
   $('#diagInfo').textContent = `${d.jumlahBaris} baris mutasi diterima dari zsql` + (d.dibuang ? `, ${d.dibuang} baris dibuang karena tanggalnya tidak terbaca` : '') + `. Saldo dihitung sampai ${judulTgl}.`;
-  $('#diagBody').innerHTML = d.akun.length ? d.akun.map(a => `<tr><td class="mono">${esc(a.kode)}</td><td>${esc(a.nama)}</td><td>${esc(a.dimensi)}</td><td>${a.jenis}</td><td>${esc(a.kategori)}</td><td class="num" style="text-align:right">${rp(a.saldo)}</td></tr>`).join('')
-    : '<tr><td colspan="6" class="empty">Tidak ada akun kas/bank yang terbaca.</td></tr>';
+  const namaKat = (kfgAktif()?.kategori || []).map((k, i) => `<option value="${i}">${esc(k.nama)}</option>`).join('');
+  $('#diagBody').innerHTML = d.akun.length ? d.akun.map((a, i) => `<tr><td class="mono">${esc(a.kode)}</td><td>${esc(a.nama)}</td><td>${esc(a.dimensi)}</td><td>${a.jenis}</td><td>${esc(a.kategori)}</td><td class="num" style="text-align:right">${rp(a.saldo)}</td><td><select class="atur" data-i="${i}"><option value="">Pindahkan ke…</option>${namaKat}</select></td></tr>`).join('')
+    : '<tr><td colspan="7" class="empty">Tidak ada akun kas/bank yang terbaca.</td></tr>';
   if (!d.jumlahBaris) {
     $('#catatan').classList.remove('hide');
     $('#catatan').textContent = 'zsql tidak mengembalikan satu pun baris kas/bank. Biasanya FILTER_AKUN di config.js belum cocok dengan akun perusahaan ini; lihat daftar akun aset di bawah dan sesuaikan.';
@@ -252,6 +258,125 @@ $('#btnAkun').addEventListener('click', async () => {
     $('#akunTbl').classList.remove('hide');
   } catch (e) { $('#akunErr').textContent = e.message; }
   finally { $('#btnAkun').disabled = false; }
+});
+
+/* ---------- pengaturan kategori (per perusahaan, tersimpan di browser) ---------- */
+let DEF = null;
+const defReady = fetch('/api/konfig-default').then(r => r.json()).then(j => { DEF = j; }).catch(() => {});
+const clone = o => JSON.parse(JSON.stringify(o));
+const kunciKfg = () => 'kfg.' + (st.slug || st.company?.id || st.company?.name || 'umum');
+const memKfg = {};
+const kfgAktif = () => L.get(kunciKfg()) || memKfg[kunciKfg()] || (DEF ? clone(DEF) : null);
+const simpanKfg = k => { memKfg[kunciKfg()] = k; L.set(kunciKfg(), k); };
+let K = null, DATAOPSI = { akun: [], departemen: [], proyek: [] }, ultimaAkun = [];
+const PALET = ['#7cb5ec', '#434348', '#90ed7d', '#f7a35c', '#8085e9', '#f15c80', '#2b908f', '#e4d354', '#a6c96a', '#9a6fb0'];
+const BY = { akun: 'Akun', kode: 'Kode akun', departemen: 'Departemen', proyek: 'Proyek' };
+const OPL = { in: 'salah satu dari daftar', contains: 'mengandung kata', regex: 'cocok pola (regex)' };
+const opt = (m, sel) => Object.entries(m).map(([k, t]) => `<option value="${k}"${k === sel ? ' selected' : ''}>${t}</option>`).join('');
+const pecah = v => String(v || '').split(/[,\n]/).map(x => x.trim()).filter(Boolean);
+function rapikanKfg(k) {   // bentuk nilai sesuai op: 'in' = array, lainnya = teks
+  k.kategori = Array.isArray(k.kategori) ? k.kategori : []; k.tunai = Array.isArray(k.tunai) ? k.tunai : [];
+  const fix = a => { a.by = BY[a.by] ? a.by : 'akun'; a.op = OPL[a.op] ? a.op : 'contains'; a.nilai = a.op === 'in' ? (Array.isArray(a.nilai) ? a.nilai.map(String) : pecah(a.nilai)) : (Array.isArray(a.nilai) ? a.nilai.join(', ') : String(a.nilai ?? '')); };
+  k.kategori.forEach((c, i) => { c.nama = String(c.nama || ''); c.warna = /^#[0-9a-f]{6}$/i.test(c.warna) ? c.warna : PALET[i % PALET.length]; c.aturan = Array.isArray(c.aturan) ? c.aturan : []; c.aturan.forEach(fix); });
+  k.tunai.forEach(fix); return k;
+}
+function isiDatalist() {
+  $('#dl-akun').innerHTML = DATAOPSI.akun.map(o => `<option value="${esc(o.kode)}" label="${esc(o.nama)}">`).join('');
+  $('#dl-departemen').innerHTML = (DATAOPSI.departemen || []).map(v => `<option value="${esc(v)}">`).join('');
+  $('#dl-proyek').innerHTML = (DATAOPSI.proyek || []).map(v => `<option value="${esc(v)}">`).join('');
+}
+const labelNilai = (by, v) => { if (by === 'akun' || by === 'kode') { const o = DATAOPSI.akun.find(x => String(x.kode) === String(v)); if (o) return `${v} — ${o.nama}`; } return String(v); };
+function aturanHtml(list, s) {
+  return list.map((a, i) => {
+    const isi = a.op === 'in'
+      ? `<div class="chips">${a.nilai.map((v, j) => `<span class="chip">${esc(labelNilai(a.by, v))}<button type="button" data-act="delChip" data-s="${s}" data-i="${i}" data-j="${j}" aria-label="Hapus">×</button></span>`).join('')}<input class="a-add" list="${a.by === 'kode' ? 'dl-akun' : 'dl-' + a.by}" placeholder="ketik / pilih lalu Enter"></div>`
+      : `<input class="a-val" value="${esc(a.nilai)}" placeholder="${a.op === 'regex' ? 'mis. ^kas|bank' : 'kata1, kata2'}">`;
+    return `<div class="ar" data-s="${s}" data-i="${i}"><span class="or">${i ? 'ATAU' : 'Jika'}</span><select class="a-by">${opt(BY, a.by)}</select><select class="a-op">${opt(OPL, a.op)}</select>${isi}<button type="button" class="x" data-act="delAr" data-s="${s}" data-i="${i}" title="Hapus aturan">×</button></div>`;
+  }).join('') + `<button type="button" class="lnk" data-act="addAr" data-s="${s}">+ aturan</button>`;
+}
+const listOf = s => s === 't' ? K.tunai : K.kategori[+s.slice(1)].aturan;
+function renderSet() {
+  $('#tunaiRules').innerHTML = aturanHtml(K.tunai, 't');
+  $('#katList').innerHTML = K.kategori.map((k, i) => `<div class="kat" data-k="${i}"><div class="kat-h"><span class="no">${i + 1}</span><input class="k-nama" value="${esc(k.nama)}" placeholder="Nama kategori"><input type="color" class="k-warna" value="${esc(k.warna)}" title="Warna"><button type="button" class="lnk" data-act="up" data-k="${i}" title="Naikkan prioritas">↑</button><button type="button" class="lnk" data-act="down" data-k="${i}" title="Turunkan prioritas">↓</button><button type="button" class="lnk bahaya" data-act="delKat" data-k="${i}">Hapus</button></div>${aturanHtml(k.aturan, 'k' + i)}</div>`).join('')
+    || '<div class="prev">Belum ada kategori. Klik "+ Tambah kategori".</div>';
+}
+const aturanDari = el => { const d = el.closest('.ar').dataset; return listOf(d.s)[+d.i]; };
+$('#pgSet').addEventListener('input', e => {
+  const t = e.target;
+  if (t.classList.contains('a-val')) aturanDari(t).nilai = t.value;
+  else if (t.classList.contains('k-nama')) K.kategori[+t.closest('.kat').dataset.k].nama = t.value;
+  else if (t.classList.contains('k-warna')) K.kategori[+t.closest('.kat').dataset.k].warna = t.value;
+});
+$('#pgSet').addEventListener('change', e => {
+  const t = e.target, d = t.closest('.ar')?.dataset;
+  if (t.classList.contains('a-by')) { const a = aturanDari(t); a.by = t.value; if (a.op === 'in') a.nilai = []; renderSet(); }
+  else if (t.classList.contains('a-op')) { const a = aturanDari(t); const lama = a.op; a.op = t.value; if (a.op === 'in' && lama !== 'in') a.nilai = pecah(a.nilai); if (a.op !== 'in' && lama === 'in') a.nilai = a.nilai.join(', '); renderSet(); }
+  else if (t.classList.contains('a-add')) {
+    const a = aturanDari(t); let v = t.value.trim(); if (!v) return;
+    if (a.by === 'akun' || a.by === 'kode') { const o = DATAOPSI.akun.find(x => String(x.nama).toLowerCase() === v.toLowerCase()); if (o) v = String(o.kode); }  // boleh ketik nama akun
+    if (!a.nilai.includes(v)) a.nilai.push(v);
+    renderSet(); document.querySelector(`.ar[data-s="${d.s}"][data-i="${d.i}"] .a-add`)?.focus();
+  }
+});
+$('#pgSet').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.classList.contains('a-add')) { e.preventDefault(); e.target.dispatchEvent(new Event('change', { bubbles: true })); } });
+$('#pgSet').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return; const d = b.dataset; e.preventDefault();
+  switch (d.act) {
+    case 'addAr': listOf(d.s).push({ by: d.s === 't' ? 'akun' : 'departemen', op: 'in', nilai: [] }); break;
+    case 'delAr': listOf(d.s).splice(+d.i, 1); break;
+    case 'delChip': listOf(d.s)[+d.i].nilai.splice(+d.j, 1); break;
+    case 'addKat': K.kategori.push({ nama: '', warna: PALET[K.kategori.length % PALET.length], aturan: [] }); break;
+    case 'delKat': if (!confirm(`Hapus kategori "${K.kategori[+d.k].nama || +d.k + 1}"?`)) return; K.kategori.splice(+d.k, 1); break;
+    case 'up': if (+d.k > 0) K.kategori.splice(+d.k - 1, 0, ...K.kategori.splice(+d.k, 1)); break;
+    case 'down': if (+d.k < K.kategori.length - 1) K.kategori.splice(+d.k + 1, 0, ...K.kategori.splice(+d.k, 1)); break;
+    default: return;
+  }
+  renderSet();
+});
+function cekKfg() {
+  K.kategori.forEach((k, i) => { if (!k.nama.trim()) k.nama = 'Kategori ' + (i + 1); });
+  if (!K.kategori.length) return 'Minimal harus ada satu kategori.';
+  for (const a of [...K.tunai, ...K.kategori.flatMap(k => k.aturan)]) if (a.op === 'regex' && a.nilai) { try { new RegExp(a.nilai, 'i'); } catch { return 'Pola regex tidak valid: ' + a.nilai; } }
+  return '';
+}
+async function bukaSet() {
+  await defReady; if (!DEF) { $('#status').className = 'bad'; $('#status').textContent = 'Konfigurasi bawaan tidak bisa dimuat dari server'; return; }
+  K = rapikanKfg(clone(kfgAktif())); $('#setErr').textContent = ''; renderSet(); showPage('pgSet');
+}
+$('#btnSet').onclick = bukaSet;
+$('#setBack').onclick = $('#setCancel').onclick = e => { e.preventDefault?.(); showPage('pgDash'); };
+$('#setSave').onclick = () => { const err = cekKfg(); if (err) { $('#setErr').textContent = err; return; } simpanKfg(K); showPage('pgDash'); muat(false); };
+$('#setReset').onclick = () => { if (confirm('Kembalikan semua pengaturan ke bawaan?')) { K = rapikanKfg(clone(DEF)); renderSet(); } };
+$('#setExport').onclick = () => {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(K, null, 2)], { type: 'application/json' }));
+  a.download = 'pengaturan-kategori.json'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+$('#setImport').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try { const j = JSON.parse(await f.text()); if (!Array.isArray(j.kategori)) throw new Error('Berkas tidak berisi daftar "kategori"'); K = rapikanKfg(j); $('#setErr').textContent = ''; renderSet(); }
+  catch (err) { $('#setErr').textContent = 'Impor gagal: ' + err.message; }
+});
+
+// Pindahkan satu akun ke kategori lain dari tabel Diagnosa
+$('#diagBody').addEventListener('change', async e => {
+  const sel = e.target.closest('select.atur'); if (!sel || sel.value === '') return;
+  const a = ultimaAkun[+sel.dataset.i], k = +sel.value, c = rapikanKfg(clone(kfgAktif()));
+  c.kategori.forEach(kt => kt.aturan.forEach(r => { if (r.op === 'in' && (r.by === 'akun' || r.by === 'kode')) r.nilai = r.nilai.filter(v => v !== String(a.kode)); })); // lepas dari aturan daftar lain
+  let r = c.kategori[k].aturan.find(x => x.by === 'akun' && x.op === 'in');
+  if (!r) { r = { by: 'akun', op: 'in', nilai: [] }; c.kategori[k].aturan.unshift(r); }
+  r.nilai.push(String(a.kode));
+  c.kategori.forEach(kt => { kt.aturan = kt.aturan.filter(x => !(x.op === 'in' && !x.nilai.length)); });
+  simpanKfg(c);
+  if (await muat(false)) {
+    const baru = ultimaAkun.find(x => x.kode === a.kode && x.dimensi === a.dimensi);
+    const tujuan = c.kategori[k].nama;
+    if (baru && baru.kategori !== tujuan) {   // kategori lain di atasnya masih mencocokkan baris ini (urutan = prioritas)
+      const blok = c.kategori.findIndex(x => x.nama === baru.kategori);
+      if (blok >= 0 && blok < k && confirm(`Akun ${a.kode} masih masuk "${baru.kategori}" karena kategori itu berada di atas "${tujuan}".\n\nNaikkan "${tujuan}" ke atas "${baru.kategori}"? (urutan ini juga menjadi urutan tampil di grafik)`)) {
+        const [m] = c.kategori.splice(k, 1); c.kategori.splice(blok, 0, m); simpanKfg(c); await muat(false);
+      } else { $('#status').className = 'bad'; $('#status').textContent = `Akun ${a.kode} masih masuk "${baru.kategori}" karena aturan di kategori yang lebih atas. Atur urutan/aturannya di Pengaturan kategori.`; }
+    }
+  }
 });
 
 /* ---------- pulihkan sesi (refresh halaman) ---------- */

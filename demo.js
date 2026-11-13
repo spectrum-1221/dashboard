@@ -15,14 +15,14 @@ function mutasiDemo(tahun, sampai) {
   const rnd = () => ((seed = (seed * 9301 + 49297) % 233280) / 233280);
   for (const a of akun) {
     // saldo awal
-    rows.push({ tanggal: `${tahun}-01-01`, kode: a.kode, nama: a.nama, dimensi: a.dim, nilai: a.skala * 3 });
+    rows.push({ tanggal: `${tahun}-01-01`, kode: a.kode, nama: a.nama, dimensi: a.dim, departemen: a.dim, proyek: '', nilai: a.skala * 3 });
     for (let m = 1; m <= 12; m++) {
       const hari = new Date(tahun, m, 0).getDate();
       for (const d of [5, 15, 25]) {
         if (d > hari) continue;
         const t = `${tahun}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
         if (t > sampai) continue;
-        rows.push({ tanggal: t, kode: a.kode, nama: a.nama, dimensi: a.dim, nilai: Math.round(a.skala * (rnd() - 0.35) * 0.25) });
+        rows.push({ tanggal: t, kode: a.kode, nama: a.nama, dimensi: a.dim, departemen: a.dim, proyek: '', nilai: Math.round(a.skala * (rnd() - 0.35) * 0.25) });
       }
     }
   }

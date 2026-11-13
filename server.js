@@ -3,7 +3,7 @@
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
-const { SQL_MUTASI, SQL_AKUN_ASET, FILTER_AKUN, TUNAI_REGEX, KATEGORI, WARNA } = require('./config');
+const { SQL_MUTASI, SQL_AKUN_ASET, FILTER_AKUN, KONFIG_DEFAULT, WARNA } = require('./config');
 const { mutasiDemo } = require('./demo');
 const { normServer: urlNorm } = require('./urlcheck');
 
@@ -106,11 +106,49 @@ function cekKolom(rows) {
     throw new Error('zsql tidak mengembalikan kolom yang diharapkan (tanggal, kode, nama, dimensi, nilai). Isi respons: ' + JSON.stringify(rows[0]).slice(0, 500));
   return rows;
 }
-const kategoriDari = r => KATEGORI.findIndex(k => k.akun.test(`${r.kode} ${r.nama}`) || (r.dimensi && k.dimensi.test(r.dimensi))); // -1 = tak terkategori
+// ---------- Pengaturan kategori (dari browser, per perusahaan) ----------
+function rapikanKonfig(k) {
+  if (!k || !Array.isArray(k.kategori)) return KONFIG_DEFAULT;
+  return {
+    kategori: k.kategori.slice(0, 20).map((c, i) => ({
+      nama: String(c?.nama || `Kategori ${i + 1}`).slice(0, 80),
+      warna: /^#[0-9a-f]{6}$/i.test(c?.warna) ? c.warna : WARNA[i % WARNA.length],
+      aturan: Array.isArray(c?.aturan) ? c.aturan : [],
+    })),
+    tunai: Array.isArray(k.tunai) ? k.tunai : [],
+  };
+}
+// Ubah daftar aturan menjadi fungsi r => boolean (cocok bila SALAH SATU aturan cocok)
+function pencocok(aturan, peringatan, label) {
+  const fs = [];
+  for (const a of (aturan || []).slice(0, 50)) {
+    const by = ['akun', 'kode', 'departemen', 'proyek'].includes(a?.by) ? a.by : 'akun';
+    const ambil = r => String(by === 'akun' ? r.nama : by === 'kode' ? r.kode : by === 'departemen' ? r.departemen : r.proyek);
+    if (a.op === 'in') {
+      const set = new Set((Array.isArray(a.nilai) ? a.nilai : []).map(String));
+      if (set.size) fs.push(r => set.has(by === 'akun' ? String(r.kode) : ambil(r))); // akun dipilih dari daftar = per kode akun
+    } else if (a.op === 'regex') {
+      const src = String(a.nilai || '').slice(0, 200); if (!src) continue;
+      try { const re = new RegExp(src, 'i'); fs.push(r => re.test(ambil(r))); }
+      catch { peringatan.push(`Regex tidak valid di "${label}": ${src}`); }
+    } else { // contains
+      const kata = String(a.nilai || '').split(/[,\n]/).map(x => x.trim().toLowerCase()).filter(Boolean);
+      if (kata.length) fs.push(r => { const t = ambil(r).toLowerCase(); return kata.some(x => t.includes(x)); });
+    }
+  }
+  return r => fs.some(f => f(r));
+}
 
-function hitung(mutasi, tahun, tanggal, dari) {
-  const rows = mutasi.map(r => ({ tanggal: tgl(r.tanggal), kode: r.kode ?? '', nama: r.nama ?? '', dimensi: r.dimensi ?? '', nilai: angka(r.nilai) })).filter(r => r.tanggal);
-  rows.forEach(r => { r.kat = kategoriDari(r); r.tunai = TUNAI_REGEX.test(r.nama); });
+function hitung(mutasi, tahun, tanggal, dari, konfig) {
+  const peringatan = [];
+  const kfg = rapikanKonfig(konfig);
+  const cocok = kfg.kategori.map(c => pencocok(c.aturan, peringatan, c.nama));
+  const tunaiCocok = pencocok(kfg.tunai, peringatan, 'Saldo Tunai');
+  const rows = mutasi.map(r => ({
+    tanggal: tgl(r.tanggal), kode: r.kode ?? '', nama: r.nama ?? '', dimensi: r.dimensi ?? '',
+    departemen: r.departemen ?? r.dimensi ?? '', proyek: r.proyek ?? '', nilai: angka(r.nilai),
+  })).filter(r => r.tanggal);
+  rows.forEach(r => { r.kat = cocok.findIndex(f => f(r)); r.tunai = tunaiCocok(r); }); // kat -1 = tak terkategori
   const sampaiTgl = batas => rows.filter(r => r.tanggal <= batas);
 
   // Grafik garis: saldo akhir tiap bulan (bulan yang belum terjadi tidak digambar)
@@ -123,22 +161,28 @@ function hitung(mutasi, tahun, tanggal, dari) {
   }
   // Pie/bar/kotak: saldo per tanggal
   const aktif = sampaiTgl(tanggal);
-  const kategori = KATEGORI.map((k, i) => ({ nama: k.nama, warna: WARNA[i], saldo: Math.round(aktif.filter(r => r.kat === i).reduce((s, r) => s + r.nilai, 0)) }));
+  const kategori = kfg.kategori.map((c, i) => ({ nama: c.nama, warna: c.warna, saldo: Math.round(aktif.filter(r => r.kat === i).reduce((s, r) => s + r.nilai, 0)) }));
   const taktegori = Math.round(aktif.filter(r => r.kat === -1).reduce((s, r) => s + r.nilai, 0));
   const tunai = Math.round(aktif.filter(r => r.tunai).reduce((s, r) => s + r.nilai, 0));
   const total = Math.round(aktif.reduce((s, r) => s + r.nilai, 0));
-  // Diagnosa: akun/dimensi apa yang terhitung dan masuk kategori mana (untuk memeriksa pola KATEGORI)
+  // Diagnosa: akun/dimensi apa yang terhitung dan masuk kategori mana
   const per = new Map();
   for (const r of aktif) {
     const key = `${r.kode}|${r.dimensi}`;
-    const x = per.get(key) || { kode: r.kode, nama: r.nama, dimensi: r.dimensi, kategori: r.kat >= 0 ? KATEGORI[r.kat].nama : '(belum terkategori)', jenis: r.tunai ? 'Tunai' : 'Rekening', saldo: 0 };
+    const x = per.get(key) || { kode: r.kode, nama: r.nama, dimensi: r.dimensi, kategori: r.kat >= 0 ? kfg.kategori[r.kat].nama : '(belum terkategori)', jenis: r.tunai ? 'Tunai' : 'Rekening', saldo: 0 };
     x.saldo += r.nilai; per.set(key, x);
   }
   const akun = [...per.values()].map(x => ({ ...x, saldo: Math.round(x.saldo) })).sort((a, b) => a.kode.localeCompare(b.kode));
+  // Pilihan untuk menu Pengaturan kategori (nilai yang muncul di data kas/bank)
+  const uniq = arr => [...new Set(arr.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'id'));
+  const opsi = {
+    akun: [...new Map(rows.map(r => [r.kode, r.nama])).entries()].map(([kode, nama]) => ({ kode, nama })).sort((a, b) => a.kode.localeCompare(b.kode)),
+    departemen: uniq(rows.map(r => r.departemen)), proyek: uniq(rows.map(r => r.proyek)),
+  };
   // Perubahan kas selama periode = saldo akhir - saldo sehari sebelum "dari"
   const sebelum = new Date(Date.UTC(+dari.slice(0, 4), +dari.slice(5, 7) - 1, +dari.slice(8, 10) - 1)).toISOString().slice(0, 10);
   const perubahan = total - Math.round(sampaiTgl(sebelum).reduce((s, r) => s + r.nilai, 0));
-  return { tahun, dari, tanggal, bulanan, kategori, taktegori, tunai, rekening: total - tunai, total, perubahan, akun, jumlahBaris: mutasi.length, dibuang: mutasi.length - rows.length };
+  return { tahun, dari, tanggal, bulanan, kategori, taktegori, tunai, rekening: total - tunai, total, perubahan, akun, opsi, peringatan, jumlahBaris: mutasi.length, dibuang: mutasi.length - rows.length };
 }
 
 // ---------- Server ----------
@@ -217,23 +261,27 @@ app.post('/auth/company', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 4) Data dashboard
-app.get('/api/dashboard', async (req, res) => {
+// 4) Data dashboard. POST body: { dari, sampai, konfig } ; GET ?dari=&sampai= (konfig bawaan)
+app.get('/api/konfig-default', (req, res) => res.json(KONFIG_DEFAULT));
+const dashboard = async (req, res) => {
   try {
     const ctx = ctxDari(req);
+    const q = { ...req.query, ...(req.body || {}) };
     // Periode ala Zahir: dari-sampai. Saldo (pie/bar/kotak) per tanggal "sampai"; grafik garis = tahun dari "sampai".
     const iso = v => /^\d{4}-\d{2}-\d{2}$/.test(v || '') ? v : null;
-    let sampai = iso(req.query.sampai) || new Date().toISOString().slice(0, 10);
-    let dari = iso(req.query.dari) || sampai;
+    let sampai = iso(q.sampai) || new Date().toISOString().slice(0, 10);
+    let dari = iso(q.dari) || sampai;
     if (dari > sampai) [dari, sampai] = [sampai, dari];
     const tahun = parseInt(sampai.slice(0, 4), 10);
     const awal = `${dari.slice(0, 4)}-01-01`;                       // saldo sebelum tanggal ini dikumpulkan jadi satu baris
     const batasSql = [sampai, `${tahun}-12-31`].sort().pop();       // sampai akhir tahun, untuk grafik bulanan
     const mutasi = DEMO ? mutasiDemo(tahun, batasSql)
       : cekKolom(await zsql(ctx, SQL_MUTASI.replaceAll('{{filterAkun}}', FILTER_AKUN).replaceAll('{{awal}}', awal).replaceAll('{{sampai}}', batasSql).trim()));
-    res.json(hitung(mutasi, tahun, sampai, dari));
+    res.json(hitung(mutasi, tahun, sampai, dari, q.konfig));
   } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
-});
+};
+app.get('/api/dashboard', dashboard);
+app.post('/api/dashboard', dashboard);
 
 // Daftar semua akun aset (klasifikasi 1) beserta saldo, untuk memilih/menyesuaikan FILTER_AKUN
 app.get('/api/akun', async (req, res) => {
