@@ -1,0 +1,16 @@
+{
+  "name": "zahir-dashboard-kas",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "start": "node server.js",
+    "demo": "DEMO=1 node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.22.3",
+    "highcharts": "^11.4.8"
+  }
+}

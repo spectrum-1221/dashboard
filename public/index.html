@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard Kas Zahir</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0f1b2d; --card:#fff; --ink:#1b2a41; --muted:#6b7a90; --line:#e3e8ef;
+  --brand:#0e7fb8; --brand2:#063e5c; --accent:#f2a93b; --ok:#2e7d32; --bad:#c62828;
+  --biru:#4dc3fa; --hijau:#36bea6;
+  font-family:"IBM Plex Sans",system-ui,sans-serif;
+}
+*{box-sizing:border-box} body{margin:0;background:#eef2f6;color:var(--ink);font-size:14px}
+.mono{font-family:"IBM Plex Mono",monospace}
+button{font:inherit;cursor:pointer;border:0;border-radius:6px;padding:9px 14px;background:var(--brand);color:#fff;font-weight:500}
+button.ghost{background:#fff;color:var(--brand);border:1px solid var(--brand)}
+button.warn{background:var(--accent);color:#1b2a41}
+button:disabled{opacity:.5;cursor:default}
+input,select{font:inherit;padding:9px 11px;border:1px solid #cbd5e1;border-radius:6px;width:100%;background:#fff;color:var(--ink)}
+input:focus,select:focus{outline:2px solid #8ecae6;border-color:var(--brand)}
+label{display:block;font-size:12px;color:var(--muted);margin:0 0 4px;font-weight:500;letter-spacing:.02em;text-transform:uppercase}
+.err{color:var(--bad);font-size:13px;margin-top:8px;white-space:pre-wrap}
+.hide{display:none!important}
+a{color:var(--brand)}
+.prev{font-size:12px;color:var(--muted)}
+
+/* ---------- LOGIN ---------- */
+#login{min-height:100vh;display:grid;grid-template-columns:1.1fr 1fr}
+#login .side{background:linear-gradient(160deg,#ffffff 0%,#f5f8fb 60%,#eaf1f7 100%);border-right:1px solid var(--line);padding:44px 48px 28px;display:flex;flex-direction:column;align-items:center;gap:18px;position:relative;overflow:hidden}
+#login .side::before{content:"";position:absolute;inset:auto -120px -160px auto;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,#fde9e5 0%,rgba(253,233,229,0) 70%)}
+#login .side .logo{display:flex;align-items:center;gap:10px;align-self:flex-start;position:relative}
+#login .side .logo img{height:44px;width:auto}
+#login .side .logo span{font-size:30px;font-weight:600;color:#e8503a;letter-spacing:-.01em;line-height:1;margin-top:6px}
+#login .side .hero{flex:1;display:flex;align-items:center;justify-content:center;width:100%;position:relative}
+#login .side .hero svg{width:min(100%,520px);height:auto}
+#login .side .tag{font-size:14px;color:var(--muted);position:relative}
+#login .form{display:flex;align-items:center;justify-content:center;padding:40px}
+#login .card{width:100%;max-width:420px;background:var(--card);border-radius:14px;padding:34px 34px 28px;box-shadow:0 20px 60px rgba(15,27,45,.18)}
+#login .card h2{margin:0 0 4px;font-size:22px}
+#login .card .sub{color:var(--muted);margin:0 0 22px;font-size:13px}
+.field{margin-bottom:14px}
+#btnLogin{width:100%;padding:12px;margin-top:6px;font-size:15px;background:var(--brand2)}
+@media (max-width:860px){#login{grid-template-columns:1fr}#login .side{padding:28px}#login .side .hero{display:none}}
+
+/* ---------- APP CHROME ---------- */
+.top{background:var(--bg);color:#fff;display:flex;align-items:center;gap:16px;padding:10px 20px;position:sticky;top:0;z-index:5}
+.top .brand{font-weight:600;letter-spacing:.02em}
+.top .db{font-size:12px;color:#9fb3c8}.top .db b{color:#fff}
+.top .spacer{flex:1}
+.top button{padding:7px 12px;font-size:13px}
+.page{padding:18px 24px;max-width:1280px;margin:0 auto}
+
+/* ---------- PILIH PERUSAHAAN ---------- */
+.cohead{display:flex;align-items:flex-start;gap:16px;margin-bottom:14px}
+.cohead h2{margin:0;font-size:22px}
+.cohead .cnt{color:var(--muted);font-size:13px;margin-top:4px}
+.cohead .signed{margin-left:auto;text-align:right}
+.cohead .signed .as{font-size:20px;color:var(--muted)}.cohead .signed .as b{color:var(--ink)}
+.cohead .signed .em{font-size:13px;color:var(--brand)}
+.cotools{display:flex;gap:10px;justify-content:flex-end;align-items:center;margin-bottom:10px}
+.cotools input{max-width:300px}
+table.co{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden}
+table.co th{text-align:left;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:12px 14px;border-bottom:1px solid var(--line);background:#fff}
+table.co td{padding:13px 14px;border-bottom:1px solid #eef1f5;font-size:13.5px}
+table.co tr.r{cursor:pointer} table.co tr.r:hover{background:#f5f8fb} table.co tr.sel{background:#e4f1f9!important}
+table.co .nm{font-weight:600} table.co .sl{font-size:12px;color:var(--muted)}
+table.co .empty{text-align:center;color:var(--muted);padding:26px}
+.badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;background:#e3e8ef;color:#44546a}
+.badge.active{background:#e6f6ec;color:var(--ok)} .badge.trial{background:#fff3d6;color:#8a5a00} .badge.expired{background:#fde8e8;color:var(--bad)}
+.hint{margin-top:10px;color:var(--muted);font-size:12px}
+details.adv summary{cursor:pointer;color:var(--muted);font-size:12px;margin:4px 0 10px}
+
+/* ---------- DASHBOARD ---------- */
+.crumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);margin-bottom:14px}
+.crumb a{text-decoration:none} .crumb .cur{color:var(--ink);font-weight:500}
+.filter{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px}
+.filter .f{width:auto} .filter select{width:110px} .filter input[type=date]{width:170px}
+#status{color:var(--muted);font-size:12px;padding-bottom:10px} #status.bad{color:var(--bad)}
+.kartu{background:var(--card);border-radius:6px;padding:8px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+.kotak{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+.box{color:#fff;padding:18px 22px;border-radius:4px}
+.box.biru{background:var(--biru);font-size:18px} .box.hijau{background:var(--hijau);font-size:15px;font-weight:600}
+.baris{display:flex;gap:10px;padding:3px 0} .baris .k{flex:1} .baris .v{min-width:150px;text-align:right;font-variant-numeric:tabular-nums}
+.baris.total{border-top:1px solid rgba(255,255,255,.5);margin-top:4px;padding-top:6px;font-weight:700}
+.catatan{margin-top:10px;color:#8a5a00;background:#fff4d6;padding:8px 12px;border-radius:6px}
+@media (max-width:820px){.grid2,.kotak{grid-template-columns:1fr}.page{padding:14px}}
+
+/* overlay */
+#ov{position:fixed;inset:0;background:rgba(15,27,45,.55);display:flex;align-items:center;justify-content:center;z-index:50}
+#ov .bx{background:#fff;border-radius:12px;padding:24px 28px;min-width:300px;text-align:center}
+#ov .t{font-weight:600;margin-bottom:4px} #ov .s{color:var(--muted);font-size:13px}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid #cbd5e1;border-top-color:var(--brand);border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px}
+@keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<!-- ================= LOGIN ================= -->
+<section id="login">
+  <div class="side">
+    <div class="logo"><img src="logo.png" alt="Zahir"><span>Dashboard Kas</span></div>
+    <div class="hero">
+      <!-- ilustrasi dashboard (SVG) -->
+      <svg viewBox="0 0 520 400" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+          <linearGradient id="gp" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f3f6fa"/></linearGradient>
+          <linearGradient id="gb" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#e8503a"/><stop offset="1" stop-color="#f58a6e"/></linearGradient>
+          <linearGradient id="gc" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#0e7fb8"/><stop offset="1" stop-color="#5ab4e0"/></linearGradient>
+          <filter id="sh" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#0f1b2d" flood-opacity=".14"/></filter>
+        </defs>
+        <circle cx="430" cy="80" r="70" fill="#fde9e5"/>
+        <circle cx="70" cy="330" r="46" fill="#e4f1f9"/>
+        <rect x="124" y="64" width="300" height="300" rx="16" fill="#e3e9f0" transform="rotate(-4 274 214)"/>
+        <g filter="url(#sh)"><rect x="110" y="50" width="300" height="310" rx="16" fill="url(#gp)"/></g>
+        <rect x="110" y="50" width="300" height="34" rx="16" fill="#0f1b2d"/><rect x="110" y="70" width="300" height="14" fill="#0f1b2d"/>
+        <circle cx="132" cy="67" r="5" fill="#e8503a"/><circle cx="148" cy="67" r="5" fill="#f2a93b"/><circle cx="164" cy="67" r="5" fill="#2db36a"/>
+        <rect x="134" y="104" width="120" height="10" rx="5" fill="#1b2a41"/>
+        <rect x="134" y="122" width="170" height="6" rx="3" fill="#cbd5e1"/>
+        <!-- pie -->
+        <g transform="translate(206 200)">
+          <circle r="44" fill="#7cb5ec"/>
+          <path d="M0 0 L0 -44 A44 44 0 0 1 41.8 13.6 Z" fill="#434348"/>
+          <path d="M0 0 L41.8 13.6 A44 44 0 0 1 -25.9 35.6 Z" fill="#90ed7d"/>
+          <path d="M0 0 L-25.9 35.6 A44 44 0 0 1 -41.8 13.6 Z" fill="#f7a35c"/>
+          <path d="M0 0 L-41.8 13.6 A44 44 0 0 1 -26 -35.5 Z" fill="#8085e9"/>
+        </g>
+        <!-- bar kecil kanan -->
+        <rect x="288" y="214" width="22" height="46" rx="4" fill="url(#gc)"/><rect x="318" y="186" width="22" height="74" rx="4" fill="url(#gb)"/>
+        <rect x="348" y="226" width="22" height="34" rx="4" fill="url(#gc)"/>
+        <line x1="134" y1="268" x2="386" y2="268" stroke="#e3e8ef" stroke-width="2"/>
+        <!-- garis tren -->
+        <polyline points="140,330 180,318 220,322 260,300 300,306 340,288 380,282" fill="none" stroke="#0e7fb8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="380" cy="282" r="6" fill="#fff" stroke="#0e7fb8" stroke-width="3"/>
+        <g filter="url(#sh)" transform="translate(356 292)">
+          <rect width="128" height="62" rx="12" fill="#fff"/>
+          <rect x="14" y="14" width="40" height="7" rx="3.5" fill="#cbd5e1"/>
+          <text x="14" y="46" font-family="IBM Plex Sans, system-ui" font-size="18" font-weight="600" fill="#1b2a41">Rp 10,9 M</text>
+          <circle cx="110" cy="18" r="8" fill="#e6f6ec"/><path d="M106 18l3 3 5-6" stroke="#2db36a" stroke-width="2" fill="none" stroke-linecap="round"/>
+        </g>
+        <g filter="url(#sh)" transform="translate(44 150)">
+          <rect width="56" height="56" rx="14" fill="#e8503a"/>
+          <path d="M16 29l10 10 16-20" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </g>
+      </svg>
+    </div>
+    <div class="tag">Pantau kas dan saldo dana — langsung dari data Zahir Anda.</div>
+  </div>
+  <div class="form">
+    <form class="card" id="frmLogin" autocomplete="on">
+      <h2>Masuk</h2>
+      <p class="sub">Masuk ke Dashboard Kas dengan akun Zahir Anda.</p>
+      <div class="field"><label>Server</label>
+        <div style="display:flex;gap:8px"><input id="server" placeholder="go.zahironline.com atau http://192.168.1.10:8989" list="srvList" required><button class="ghost" type="button" id="btnSaveSrv" title="Simpan server ini sebagai bawaan">Simpan</button></div>
+        <datalist id="srvList"></datalist><div class="prev" id="srvSaved" style="min-height:14px;color:var(--ok)"></div></div>
+      <div class="field"><label>Email</label><input id="user" type="email" placeholder="nama@perusahaan.com" required></div>
+      <div class="field"><label>Password</label><input id="pass" type="password" required></div>
+      <button id="btnLogin" type="submit">Masuk</button>
+      <div class="err" id="loginErr"></div>
+    </form>
+  </div>
+</section>
+
+<!-- ================= APP ================= -->
+<section id="app" class="hide">
+  <div class="top">
+    <span class="brand"><img src="logo.png" alt="Zahir" style="height:22px;vertical-align:middle;margin-right:6px">Dashboard Kas</span>
+    <span class="db" id="whoami"></span>
+    <span class="spacer"></span>
+    <button class="ghost hide" id="btnDb">Ganti perusahaan</button>
+    <button class="warn" id="btnLogout">Keluar</button>
+  </div>
+
+  <!-- halaman 1: pilih perusahaan -->
+  <div class="page" id="pgCo">
+    <div class="cohead">
+      <div><h2>Pilih Perusahaan</h2><div class="cnt" id="coCnt">—</div></div>
+      <div class="signed"><div class="as">Signed as <b id="sName"></b></div><div class="em" id="sEmail"></div></div>
+    </div>
+    <div class="cotools"><input id="dbQ" placeholder="Cari Perusahaan" autocomplete="off"><button class="ghost" id="btnReload" title="Muat ulang">&#8635;</button></div>
+    <table class="co"><thead><tr><th style="width:40%">Perusahaan</th><th>Versi</th><th>Edisi</th><th>Kedaluarsa</th><th>Status</th></tr></thead><tbody id="coBody"></tbody></table>
+    <div class="hint">Klik dua kali baris perusahaan untuk membukanya, atau pilih lalu tekan Enter.</div>
+    <div class="err" id="dbErr"></div>
+    <details class="adv" style="margin-top:10px"><summary>Alamat database manual (slug)</summary>
+      <div style="display:flex;gap:8px;max-width:520px"><input id="manualDb" placeholder="namapt-pg.zahironline.com"><button class="ghost" id="btnManualDb" type="button">Buka</button></div>
+    </details>
+  </div>
+
+  <!-- halaman 2: dashboard -->
+  <div class="page hide" id="pgDash">
+    <div class="crumb"><a href="#" id="crumbCo">Perusahaan</a> › <span class="cur" id="dashCo"></span> › <span class="cur">Kas dan Saldo</span></div>
+    <div class="filter">
+      <div class="f"><label>Tahun</label><select id="tahun"></select></div>
+      <div class="f"><label>Tanggal</label><input type="date" id="tanggal"></div>
+      <button id="muat">Muat</button>
+      <span id="status"></span>
+    </div>
+    <div class="kartu"><div id="garis" style="height:260px"></div></div>
+    <div class="grid2">
+      <div class="kartu"><div id="pie" style="height:380px"></div></div>
+      <div class="kartu"><div id="bar" style="height:380px"></div></div>
+    </div>
+    <div class="kotak">
+      <div class="box biru" id="boxSaldo"></div>
+      <div class="box hijau" id="boxKategori"></div>
+    </div>
+    <div class="catatan hide" id="catatan"></div>
+  </div>
+</section>
+
+<div id="ov" class="hide"><div class="bx"><div class="t" id="ovTitle"></div><div class="s" id="ovSub"></div></div></div>
+
+<script src="/vendor/highcharts.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
